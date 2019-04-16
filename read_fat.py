@@ -4,9 +4,7 @@ import os
 import re
 import itertools
 import array
-import binascii
 import struct
-import pprint
 
 #function to flip list of bytes in little endian
 def to_big_en(byte_list,width):
@@ -38,6 +36,13 @@ def clean_hexdump(filename):
 
 	clean_list = list(itertools.chain(*clean_list))
 	return clean_list
+
+
+def calculate_offset(N_input):
+	First_sec_of_File = Start_Data_sector + (N_input -2) * BPB_SecPerClus
+	First_sec_offset = First_sec_of_cluster * BPB_bytsPerSec
+
+	return First_sec_offset
 
 
 
@@ -89,6 +94,7 @@ def print_root(root_list):
 			DIR_FileSize = int('0x'+''.join(DIR_FileSize),0)
 			print("File size:{} bytes".format(DIR_FileSize))
 			print('DIR_Cluster Num: ',DIR_clus)
+			print('Cluster Byte offset:{} or {}'.format(hex(calculate_offset(DIR_clus)), calculate_offset(DIR_clus)))
 		
 		elif( DIR_Attr == '0f'):
 
@@ -134,13 +140,13 @@ def dump_file(N,file_size):
 
 	
 	First_sec_of_File = Start_Data_sector + (N -2) * BPB_SecPerClus
-	First_sec_offset = First_sec_of_cluster * BPB_bytsPerSec
+	File_offset = First_sec_of_File * BPB_bytsPerSec
 
 
-	cmd = 'sudo dd if={} ibs=1 count={} skip={} > file_cont.raw'.format(DEV_Name,file_size,First_sec_offset)
+	cmd = 'sudo dd if={} ibs=1 count={} skip={} > file_cont.raw'.format(DEV_Name,file_size,File_offset)
 	print('command is:',cmd)
 	os.system(cmd)
-	os.system('hexdump -C sub_dir.raw > file_cont.txt') #printing 32-bit fat entry
+	os.system('hexdump -C file_cont.raw > file_cont.txt') #printing 32-bit fat entry
 	os.system('cat file_cont.txt')
 
 def parse_subdir(N):
@@ -160,7 +166,6 @@ def parse_subdir(N):
 	root_list=clean_hexdump('sub_dir.txt')
 
 	print_root(root_list)
-
 
 
 def parse_fat(fat_list):
@@ -433,6 +438,8 @@ if(opt =='2'):
 elif(opt == '1'):
 	filesz = input("Please Input File size: ")
 	file_clusNum = input("Please Input File cluster number: ")
+
+	print("Reading at byte offset:",calculate_offset(int(file_clusNum)))
 	dump_file(int(file_clusNum),int(filesz))
 	#parse_subdir(int(file_clusNum))
  

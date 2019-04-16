@@ -188,7 +188,7 @@ def parse_fat(fat_list):
 		
 
 #------------------Main script----------------------------
-
+print("Note: this script assumes that sd card is formatted in FAT32 and is recognized as /dev/sdb1")
 DEV_Name = '/dev/sdb1'
 offset = int('0x0' ,0)
 print('Offset is: '+str(offset))

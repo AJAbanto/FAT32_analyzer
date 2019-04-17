@@ -71,8 +71,8 @@ def print_root(root_list):
 				break
 
 			DIR_FstClusHI = to_big_en(root_list[ent_offset+ 20: ent_offset+ 22],2)
-			DIR_FstClusLO = to_big_en(root_list[ent_offset+ 26: ent_offset+ 28],2)
-			DIR_FileSize = to_big_en(root_list[ent_offset + 26: ent_offset+ 33],4)
+			DIR_FstClusLO = to_big_en(root_list[ent_offset+ 26: ent_offset+ 29],2)
+			DIR_FileSize = to_big_en(root_list[ent_offset + 28: ent_offset+ 33],4)
 
 			print('DIR_Name:',DIR_Name)
 			print('DIR_Attr:',DIR_Attr)
@@ -94,7 +94,8 @@ def print_root(root_list):
 			DIR_FileSize = int('0x'+''.join(DIR_FileSize),0)
 			print("File size:{} bytes".format(DIR_FileSize))
 			print('DIR_Cluster Num: ',DIR_clus)
-			print('Cluster Byte offset:{} or {}'.format(hex(calculate_offset(DIR_clus)), calculate_offset(DIR_clus)))
+			print('Cluster Byte offset:{}'.format(hex(calculate_offset(DIR_clus))))
+			print('File Byte offset:{}'.format(hex(calculate_offset(DIR_clus) + ent_offset)))
 		
 		elif( DIR_Attr == '0f'):
 
@@ -109,9 +110,6 @@ def print_root(root_list):
 				if(i == 'ff'):  #avoid trash character
 					break
 				buff.append(chr(int('0x'+i,0)))
-
-
-
 
 			#LFN[12-13]
 			for i in root_list[ent_offset+28  : ent_offset+32]:
@@ -421,25 +419,38 @@ print_root(root_list)
 print("\n------------ |END  OF ROOT DIR|---------------\n")
 
 
-opt = input("Menu:\n[1]Access File (Hexdump)\n[2]Access Sub-directuory\n[3]Exit\n   Option:")
+
 #----------------Retrieving arbitrary sub directory----------
-if(opt =='2'):
+while True:
+	opt = input("Menu:\n[1]Access File (Hexdump)\n[2]Access Sub-directuory\n[3]Back to Root\n[4]Exit\n   Option:")
+
+	if(opt =='2'):
 	
-	clusNum =input("Please Enter Directory Cluster Number: ")	
-	print('\n----------|Printing Sub DIR|-------------\n')	
+		clusNum =input("Please Enter Directory Cluster Number: ")	
+		print('\n----------|Printing Sub DIR|-------------\n')	
 
-	try:	
-		parse_subdir(int(clusNum))
-	except:
-		print("Error: Invalid cluster number")
+		try:	
+			parse_subdir(int(clusNum))
+		except:
+			print("Error: Invalid cluster number")
 
-	print('\n---------|Done Printing Sub DIR|-------------\n')	
+		print('\n---------|Done Printing Sub DIR|-------------\n')	
 
-elif(opt == '1'):
-	filesz = input("Please Input File size: ")
-	file_clusNum = input("Please Input File cluster number: ")
+	elif(opt == '1'):
+		filesz = input("Please Input File size: ")
+		file_clusNum = input("Please Input File cluster number: ")
 
-	print("Reading at byte offset:",calculate_offset(int(file_clusNum)))
-	dump_file(int(file_clusNum),int(filesz))
-	#parse_subdir(int(file_clusNum))
- 
+		print("Reading at byte offset:",calculate_offset(int(file_clusNum)))
+		dump_file(int(file_clusNum),int(filesz))
+		#parse_subdir(int(file_clusNum))
+	elif(opt == '3'):
+		print('\n----------|Printing Root DIR|-------------\n')	
+		parse_subdir(2)
+		print('\n---------|Done Printing Root DIR|----------\n')	
+	elif(opt == '4'):
+		exit()
+	else:
+		
+		print("Invalid option, please try again\n")
+		pass
+

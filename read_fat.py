@@ -48,7 +48,7 @@ def calculate_offset(N_input):
 
 
 def print_root(root_list):
-	root_len = len(root_list)+32
+	root_len = len(root_list)
 	ent_offset = 0
 	high_lfn=''
 	LFN_complete = False #LFN search flag
@@ -111,9 +111,14 @@ def print_root(root_list):
 			print("File size:{} bytes".format(DIR_FileSize))
 			print('DIR_Cluster Num: ',DIR_clus)
 			print('Cluster Byte offset:{}'.format(hex(calculate_offset(DIR_clus))))
-			print('File Byte offset:{}'.format(hex(calculate_offset(DIR_clus) + ent_offset)))
-			
-			
+			print('File Byte offset:{} => {} '.format(hex(calculate_offset(DIR_clus) + ent_offset),calculate_offset(DIR_clus) + ent_offset))
+			os.system('echo DIR_Name: {} >> files.log'.format(DIR_Name))
+			os.system('echo Attr: {} >> files.log'.format(DIR_Attr))
+			os.system('echo FILE-TYPE: {} >> files.log'.format(file_type))
+			os.system("echo File size:{} bytes >> files.log".format(DIR_FileSize))
+			os.system('echo DIR_Cluster Num:{} >>files.log'.format(DIR_clus))
+			os.system('echo Cluster Byte offset:{} >>files.log'.format(hex(calculate_offset(DIR_clus))))
+			os.system('echo File Byte offset hex:{} int:{}\n\n  >>files.log '.format(hex(calculate_offset(DIR_clus) + ent_offset),calculate_offset(DIR_clus) + ent_offset))
 		elif( DIR_Attr == '0f'):
 
 			#LFN[0-5]
@@ -173,30 +178,15 @@ def print_root(root_list):
 
 			if(LFN_ended and LFN_complete):
 				print('LFN:',''.join(LFN))
+				LFN_str = ''.join(LFN)
+				with open('files.log','a') as f_out:
+					f_out.write('\nLFN:{} \n'.format(LFN_str))				
 				LFN = []				
 				LFN_complete = False
 				LFN_ended = False
 				LFN_reverse = False
 				LFN_start = False
 				
-
-
-			'''
-
-			if(root_list[0+ent_offset] == '01'):
-				high_lfn =DIR_Name
-				#print('start LFN checksum:',root_list[13+ent_offset])
-
-			elif(root_list[0+ent_offset] == '41'):
-				whole_lfn = DIR_Name
-				print('LFN:',whole_lfn)
-				#print('End LFN checksum:',root_list[13+ent_offset])
-
-			elif(root_list[0+ent_offset] == '42'):
-				whole_lfn = high_lfn + DIR_Name
-				print('LFN:',whole_lfn)
-				#print('End LFN checksum:',root_list[13+ent_offset])				
-			'''
 		ent_offset += 32
 			
 			
@@ -230,9 +220,9 @@ def parse_subdir(N):
 	os.system('hexdump -C sub_dir.raw > sub_dir.txt') #printing 32-bit fat entry
 	os.system('cat sub_dir.txt')
 
-	root_list=clean_hexdump('sub_dir.txt')
+	sub_list=clean_hexdump('sub_dir.txt')
 
-	print_root(root_list)
+	print_root(sub_list)
 
 
 def parse_fat(fat_list):

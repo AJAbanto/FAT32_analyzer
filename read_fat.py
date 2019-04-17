@@ -48,15 +48,31 @@ def calculate_offset(N_input):
 
 
 def print_root(root_list):
-	root_len = len(root_list)
+	root_len = len(root_list)+32
 	ent_offset = 0
 	high_lfn=''
-	while ent_offset < root_len:
-		
+	LFN_complete = False #LFN search flag
+	LFN_ended = False
+	LFN_start = False
+	LFN_reverse = False
+	LFN =[]
+			
+
+	while ent_offset != root_len:
 		print("\n")
 		buff =[]
-		#check if long file name
+		
+
+		#Skip files marked unused
+		if(root_list[ent_offset+0]=='e5'):
+			ent_offset += 32			
+			continue
+	
+		#check Attribute if long file name
 		DIR_Attr = root_list[ent_offset+ 11]
+
+		
+		
 
 		if( DIR_Attr != '0f'):
 			
@@ -72,7 +88,7 @@ def print_root(root_list):
 
 			DIR_FstClusHI = to_big_en(root_list[ent_offset+ 20: ent_offset+ 22],2)
 			DIR_FstClusLO = to_big_en(root_list[ent_offset+ 26: ent_offset+ 29],2)
-			DIR_FileSize = to_big_en(root_list[ent_offset + 28: ent_offset+ 33],4)
+			DIR_FileSize = to_big_en(root_list[ent_offset + 28: ent_offset+ 32],4)
 
 			print('DIR_Name:',DIR_Name)
 			print('DIR_Attr:',DIR_Attr)
@@ -96,17 +112,17 @@ def print_root(root_list):
 			print('DIR_Cluster Num: ',DIR_clus)
 			print('Cluster Byte offset:{}'.format(hex(calculate_offset(DIR_clus))))
 			print('File Byte offset:{}'.format(hex(calculate_offset(DIR_clus) + ent_offset)))
-		
+			
+			
 		elif( DIR_Attr == '0f'):
 
-			
 			#LFN[0-5]
 			for i in root_list[ent_offset+1  : ent_offset+11]:
 				buff.append(chr(int('0x'+i,0)))
 
 
 			#LFN[6-11]
-			for i in root_list[ent_offset+14  : ent_offset+26]:
+			for i in root_list[ent_offset+14  : ent_offset+27]:
 				if(i == 'ff'):  #avoid trash character
 					break
 				buff.append(chr(int('0x'+i,0)))
@@ -117,22 +133,75 @@ def print_root(root_list):
 					break				
 				buff.append(chr(int('0x'+i,0)))
 
-			DIR_Name = ''.join(buff)
+			DIR_Name_LFN = ''.join(buff)
+			#print(DIR_Name_LFN,root_list[0+ent_offset])
+			seqNum = int(root_list[0+ent_offset][1])
 			
+			seqNum_stat = int(root_list[0+ent_offset][0])
+			#print('seqNum',seqNum)
+
+			if(seqNum_stat == 4 and LFN_start):	  #Encountered last part of lfn last
+				#record lfn normally
+				LFN.append(DIR_Name_LFN)
+				LFN_ended = True
+				LFN_complete = True
+
+			elif(seqNum_stat == 4 and not LFN_start): #Encountered last part of lfn first
+				#record lfn in reverse
+				LFN.append(DIR_Name_LFN)
+				LFN_reverse = True
+				if(seqNum == 1):
+					LFN_ended = True
+					LFN_complete = True
+				else:
+					LFN_ended = False
+					LFN_complete = False
+				
+			elif(LFN_reverse):
+				LFN.insert(0,DIR_Name_LFN)
+				if(seqNum == 1):
+					LFN_ended = True
+					LFN_complete = True
+				
+				
+			
+			else:
+				LFN.append(DIR_Name_LFN)
+				LFN_start = True				
+				
+				
+
+			if(LFN_ended and LFN_complete):
+				print('LFN:',''.join(LFN))
+				LFN = []				
+				LFN_complete = False
+				LFN_ended = False
+				LFN_reverse = False
+				LFN_start = False
+				
+
+
+			'''
+
 			if(root_list[0+ent_offset] == '01'):
 				high_lfn =DIR_Name
+				#print('start LFN checksum:',root_list[13+ent_offset])
+
 			elif(root_list[0+ent_offset] == '41'):
 				whole_lfn = DIR_Name
 				print('LFN:',whole_lfn)
-				print('LFN checksum:',root_list[13+ent_offset])
+				#print('End LFN checksum:',root_list[13+ent_offset])
+
 			elif(root_list[0+ent_offset] == '42'):
 				whole_lfn = high_lfn + DIR_Name
 				print('LFN:',whole_lfn)
-				print('LFN checksum:',root_list[13+ent_offset])				
-			
-			
-			
+				#print('End LFN checksum:',root_list[13+ent_offset])				
+			'''
 		ent_offset += 32
+			
+			
+		
+#Note: LFNs might not be matched
 
 def dump_file(N,file_size):
 
@@ -186,8 +255,10 @@ def parse_fat(fat_list):
 		
 
 #------------------Main script----------------------------
-print("Note: this script assumes that sd card is formatted in FAT32 and is recognized as /dev/sdb1")
-DEV_Name = '/dev/sdb1'
+#print("Note: this script assumes that sd card is formatted in FAT32 and is recognized as /dev/sdb1")
+
+
+DEV_Name = input('please input device name (i.e: /dev/sdb1): ')
 offset = int('0x0' ,0)
 print('Offset is: '+str(offset))
 
@@ -399,7 +470,7 @@ fat_list = clean_hexdump('fat_list.txt')
 print('\nReading root directory.......')
 
 
-root_width = 512   #in bytes
+root_width = BPB_bytsPerSec * BPB_SecPerClus   #in bytes
 N = BPB_RootClus   #root cluster
 
 First_sec_of_cluster = Start_Data_sector + (N -2) * BPB_SecPerClus

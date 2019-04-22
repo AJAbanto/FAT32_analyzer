@@ -23,7 +23,6 @@ def get_bytes(clean_list,width,indx):
 
 #clean up hexdump output
 def clean_hexdump(filename):
-	
 	clean_list = list()
 	read_ln = list()
 	with open(filename) as f:
@@ -39,10 +38,9 @@ def clean_hexdump(filename):
 
 
 def calculate_offset(N_input):
-	First_sec_of_File = Start_Data_sector + (N_input -2) * BPB_SecPerClus
-	First_sec_offset = First_sec_of_cluster * BPB_bytsPerSec
-
-	return First_sec_offset
+	First_sec_of_File = Start_Data_sector + (N_input-2) * BPB_SecPerClus
+	File_offset = First_sec_of_File * BPB_bytsPerSec
+	return File_offset
 
 
 
@@ -101,8 +99,6 @@ def print_root(root_list):
 				file_type = 'Volume ID'
 
 			print('FILE-TYPE:',file_type)
- 
-			#print('DIR_ClusHI:{}\nDIR_ClusLO:{}'.format(DIR_FstClusHI,DIR_FstClusLO))
 
 			#Pointer to next cluster
 			DIR_clus = ''.join(DIR_FstClusHI) + ''.join(DIR_FstClusLO)
@@ -110,15 +106,22 @@ def print_root(root_list):
 			DIR_FileSize = int('0x'+''.join(DIR_FileSize),0)
 			print("File size:{} bytes".format(DIR_FileSize))
 			print('DIR_Cluster Num: ',DIR_clus)
-			print('Cluster Byte offset:{}'.format(hex(calculate_offset(DIR_clus))))
-			print('File Byte offset:{} => {} '.format(hex(calculate_offset(DIR_clus) + ent_offset),calculate_offset(DIR_clus) + ent_offset))
-			os.system('echo DIR_Name: {} >> files.log'.format(DIR_Name))
-			os.system('echo Attr: {} >> files.log'.format(DIR_Attr))
-			os.system('echo FILE-TYPE: {} >> files.log'.format(file_type))
-			os.system("echo File size:{} bytes >> files.log".format(DIR_FileSize))
-			os.system('echo DIR_Cluster Num:{} >>files.log'.format(DIR_clus))
-			os.system('echo Cluster Byte offset:{} >>files.log'.format(hex(calculate_offset(DIR_clus))))
-			os.system('echo File Byte offset hex:{} int:{}\n\n  >>files.log '.format(hex(calculate_offset(DIR_clus) + ent_offset),calculate_offset(DIR_clus) + ent_offset))
+			#print('Cluster Byte offset:{}'.format(hex(calculate_offset(DIR_clus))))
+			print('Byte offset:{} '.format(calculate_offset(DIR_clus) + ent_offset))
+			print('512-block sized offset:{}'.format(int((calculate_offset(DIR_clus)+ent_offset)/512)))
+
+			if record:
+
+				if not LFN_start or not LFN_reverse:
+					os.system('echo  >> files.log')
+				os.system('echo DIR_Name: {} >> files.log'.format(DIR_Name))
+				os.system('echo Attr: {} >> files.log'.format(DIR_Attr))
+				os.system('echo FILE-TYPE: {} >> files.log'.format(file_type))
+				os.system("echo File size:{} bytes >> files.log".format(DIR_FileSize))
+				os.system('echo DIR_Cluster Num:{} >>files.log'.format(DIR_clus))
+				os.system('echo Byte offset hex:{}  >>files.log '.format(calculate_offset(DIR_clus) + ent_offset))
+				os.system('echo 512-block sized offset:{} >>files.log'.format(int((calculate_offset(DIR_clus)+ent_offset)/512)))
+
 		elif( DIR_Attr == '0f'):
 
 			#LFN[0-5]
@@ -179,8 +182,10 @@ def print_root(root_list):
 			if(LFN_ended and LFN_complete):
 				print('LFN:',''.join(LFN))
 				LFN_str = ''.join(LFN)
-				with open('files.log','a') as f_out:
-					f_out.write('\nLFN:{} \n'.format(LFN_str))				
+
+				if record:
+					with open('files.log','a') as f_out:
+						f_out.write('\nLFN:{} \n'.format(LFN_str))				
 				LFN = []				
 				LFN_complete = False
 				LFN_ended = False
@@ -195,12 +200,8 @@ def print_root(root_list):
 
 def dump_file(N,file_size):
 
-	
-	First_sec_of_File = Start_Data_sector + (N -2) * BPB_SecPerClus
-	File_offset = First_sec_of_File * BPB_bytsPerSec
-
-
-	cmd = 'sudo dd if={} ibs=1 count={} skip={} > file_cont.raw'.format(DEV_Name,file_size,File_offset)
+	dump_offset = calculate_offset(N)
+	cmd = 'sudo dd if={} ibs=1 count={} skip={} > file_cont.raw'.format(DEV_Name,file_size,dump_offset)
 	print('command is:',cmd)
 	os.system(cmd)
 	os.system('hexdump -C file_cont.raw > file_cont.txt') #printing 32-bit fat entry
@@ -210,10 +211,9 @@ def parse_subdir(N):
 	#read subdir
 
 	dir_width = 4*1024  #read 4kb bytes               
-	First_sec_of_cluster = Start_Data_sector + (N -2) * BPB_SecPerClus
-	First_sec_offset = First_sec_of_cluster * BPB_bytsPerSec
+	
 
-
+	First_sec_offset = calculate_offset(N)
 	cmd = 'sudo dd if={} ibs=1 count={} skip={} > sub_dir.raw'.format(DEV_Name,dir_width,First_sec_offset)
 	print('command is:',cmd)
 	os.system(cmd)
@@ -240,7 +240,8 @@ def parse_fat(fat_list):
 		fat_offset = ent_num * 32
 		
 		
-
+def clean_files():
+	os.system('sudo rm -f file_* fat* root_* sub_* boot_* temp*')
 	
 		
 
@@ -249,6 +250,20 @@ def parse_fat(fat_list):
 
 
 DEV_Name = input('please input device name (i.e: /dev/sdb1): ')
+
+while True:
+	record_optn = input('Record output?\n[1]Yes\n[2]No\n Option:')
+	if record_optn == '1':
+		record = True
+		break
+	elif record_optn == '2':
+		record = False
+		break
+	else:
+		print('Invalid option, please try again\n')
+		continue
+
+
 offset = int('0x0' ,0)
 print('Offset is: '+str(offset))
 
@@ -416,10 +431,7 @@ Tot_data_sec = BPB_TotSec32 - Start_Data_sector
 count_of_clusters = Tot_data_sec / BPB_SecPerClus
 
                                        #confirming FAT type
-if count_of_clusters >= 65526:
-	print('its fat32 with clusters: ',count_of_clusters)
-else:
-	print('not fat32')
+
 
 
 print('FAT offset: {} \nFAT size: {}'.format(Start_Fat_sector,Tot_fat_sec))
@@ -468,7 +480,7 @@ First_sec_offset = First_sec_of_cluster * BPB_bytsPerSec
 
 
 cmd = 'sudo dd if={} ibs=1 count={} skip={} > fat.raw'.format(DEV_Name,root_width,First_sec_offset)
-print('command is:',cmd)
+#print('command is:',cmd)
 os.system(cmd)
 os.system('hexdump -C fat.raw > root_dir.txt') #printing 32-bit fat entry
 #os.system('cat root_dir.txt')
@@ -509,6 +521,7 @@ while True:
 		parse_subdir(2)
 		print('\n---------|Done Printing Root DIR|----------\n')	
 	elif(opt == '4'):
+		clean_files()		
 		exit()
 	else:
 		
